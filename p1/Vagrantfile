@@ -1,0 +1,51 @@
+Vagrant.configure(2) do |config|
+
+  #Configure Server
+  config.vm.define "rostrohS" do |rostrohS|
+    rostrohS.vm.box = "debian/stretch64"
+    rostrohS.vm.hostname = "rostrohS"
+    rostrohS.vm.box_url = "debian/stretch64"
+    rostrohS.vm.network "private_network", ip: "192.168.56.110"
+    #kubernetes Access
+    rostrohS.vm.network :forwarded_port, guest: 6443, host: 6443
+    for p in 30000..30100
+      rostrohS.vm.network :forwarded_port, guest: p, host: p, protocol: "tcp"
+    end
+    rostrohS.vm.provider :virtualbox do |v|
+      v.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
+      v.customize ["modifyvm", :id, "--memory", 1024]
+      v.customize ["modifyvm", :id, "--name", "rostrohS"]
+      v.customize ["modifyvm", :id, "--cpus", 1]
+    end
+    #configure ssh connexion
+    rostrohS.vm.provision "shell", inline: <<-SHELL
+   sed -i 's/ChallengeResponseAuthentication no/ChallengeResponseAuthentication yes/g' /etc/ssh/sshd_config
+   service ssh restart
+    SHELL
+    #provisionning k3s
+    rostrohS.vm.provision "k3s shell script", type: "shell", path: "scripts/k3s.sh"
+    rostrohS.vm.provision "k3sServer", type: "shell", path: "scripts/serv.sh"
+  end
+
+  #configure Server worker
+  config.vm.define "rostrohSW" do |rostrohSW|
+    rostrohSW.vm.box = "debian/stretch64"
+    rostrohSW.vm.hostname = "rostrohSW"
+    rostrohSW.vm.box_url = "debian/stretch64"
+    rostrohSW.vm.network :private_network, ip: "192.168.56.111"
+    rostrohSW.vm.provider :virtualbox do |v|
+      v.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
+      v.customize ["modifyvm", :id, "--memory", 1024]
+      v.customize ["modifyvm", :id, "--name", "rostrohSW"]
+      v.customize ["modifyvm", :id, "--cpus", 1]
+    end
+    #configure ssh connexion
+    config.vm.provision "shell", inline: <<-SHELL
+    sed -i 's/ChallengeResponseAuthentication no/ChallengeResponseAuthentication yes/g' /ect/ssh/sshd_config
+    service ssh restart
+    SHELL
+      #provisionning k3s
+    rostrohSW.vm.provision "k3s shell script", type: "shell", path: "scripts/k3s.sh"
+    rostrohSW.vm.provision "k3sWorker", type: "shell", path: "scripts/worker.sh"
+  end
+end
